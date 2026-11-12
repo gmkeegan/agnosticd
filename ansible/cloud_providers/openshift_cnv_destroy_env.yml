@@ -1,0 +1,21 @@
+---
+- import_playbook: ../include_vars.yml
+
+- name: Delete Infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Run infra-openshift-cnv-resources
+      ansible.builtin.include_role:
+        name: infra-openshift-cnv-resources
+      vars:
+        ACTION: destroy
+
+    - name: Run infra-dns Role
+      when: cluster_dns_server is defined or route53_aws_zone_id is defined
+      ansible.builtin.include_role:
+        name: infra-dns
+      vars:
+        _dns_state: absent

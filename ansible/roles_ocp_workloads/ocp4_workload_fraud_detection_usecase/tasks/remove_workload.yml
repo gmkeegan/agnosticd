@@ -1,0 +1,52 @@
+---
+- name: Delete starburst CRs and associated resources
+  kubernetes.core.k8s:
+    state: absent
+    template: "{{ item }}"
+  with_fileglob:
+    - "templates/starburst/operands/*.j2"
+    - "templates/starburst/cache/*.j2"
+  register: result
+  until: result is not failed
+  retries: 10
+  delay: 6
+
+- name: Delete postgres catalog resources
+  kubernetes.core.k8s:
+    state: absent
+    template: "{{ item }}"
+  loop:
+    - postgres/postgres.yml.j2
+  register: result
+  until: result is not failed
+  retries: 10
+  delay: 6
+
+- name: Delete starburst subscriptions
+  kubernetes.core.k8s:
+    state: absent
+    template: starburst/operator/subscription.yml.j2
+  register: result
+  until: result is not failed
+  retries: 10
+  delay: 6
+
+- name: Delete starburst operatorgroups
+  kubernetes.core.k8s:
+    state: absent
+    template: starburst/operator/operatorgroup.yml.j2
+  register: result
+  until: result is not failed
+  retries: 10
+  delay: 6
+
+- name: Delete ClusterServiceVersion starburst
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ item.namespace }}"
+    name: "{{ item.name }}"
+  loop:
+  # yamllint disable-line rule:line-length
+    - {namespace: "{{ ocp4_workload.starburst.namespace }}", name: "starburst-enterprise-helm-operator.{{ ocp4_workload.starburst.startingCSV }}"}

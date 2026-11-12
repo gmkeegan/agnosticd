@@ -1,0 +1,37 @@
+---
+apiVersion: eda.ansible.com/v1alpha1
+kind: EDA
+metadata:
+  name: {{ ocp4_workload_eda_controller_project_app_name }}
+  namespace: {{ ocp4_workload_eda_controller_project }}
+spec:
+  route_tls_termination_mechanism: Edge
+  ingress_type: Route
+  loadbalancer_port: 80
+  no_log: true
+  activation_worker:
+    replicas: 5
+  image_pull_policy: IfNotPresent
+  ipv6_disabled: false
+  ui:
+    replicas: 1
+  set_self_labels: true
+  api:
+    gunicorn_workers: 2
+    replicas: 1
+  force_drop_db: false
+  scheduler:
+    replicas: 1
+  redis:
+    replicas: 1
+  loadbalancer_protocol: http
+  default_worker:
+    replicas: 2
+  worker:
+    replicas: 2
+  automation_server_url: '{{ ocp4_workload_eda_controller_aap_controller_url }}'
+  admin_user: admin
+  admin_password_secret: {{ ocp4_workload_eda_controller_project_app_name }}-admin-password
+  extra_settings:
+    - setting: EDA_MAX_RUNNING_ACTIVATIONS
+      value: '{{ ocp4_workload_eda_controller_eda_max_running_activations }}'

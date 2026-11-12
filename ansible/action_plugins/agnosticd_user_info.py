@@ -20,18 +20,32 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 import json
+import yaml
 import os
+
+# Force yaml string representation for safe dump
+yaml.SafeDumper.yaml_representers[None] = lambda self, data: \
+    yaml.representer.SafeRepresenter.represent_str(
+        self,
+        str(data),
+    )
 
 from ansible.errors import AnsibleError, AnsibleUndefinedVariable
 from ansible.module_utils.six import string_types
 from ansible.module_utils._text import to_text
 from ansible.plugins.action import ActionBase
+try:
+    # ansible-core 2.19+: needed when templating code-authored strings
+    from ansible.template import trust_as_template
+except Exception:
+    # 2.18 and earlier: no-op
+    trust_as_template = lambda x: x
 
 class ActionModule(ActionBase):
     '''Print statements during execution and save user info to file'''
 
     TRANSFERS_FILES = False
-    _VALID_ARGS = frozenset(('msg','data'))
+    _VALID_ARGS = frozenset(('msg','data','user','body'))
 
     def run(self, tmp=None, task_vars=None):
         self._supports_check_mode = True
@@ -40,13 +54,35 @@ class ActionModule(ActionBase):
             task_vars = dict()
 
         result = super(ActionModule, self).run(tmp, task_vars)
+        result['_ansible_verbose_always'] = True
         del tmp # tmp no longer has any effect
 
         msg = self._task.args.get('msg')
-        data = self._task.args.get('data')
+        body = self._task.args.get('body')
+        data = self._task.args.get('data', {})
+        user = self._task.args.get('user')
 
-        if msg:
-            result['msg'] = 'user.info: ' + msg
+        if msg and body:
+            result['failed'] = True
+            result['error'] = 'msg and body are mutually exclusive'
+            return result
+
+        if msg != None:
+            if user:
+                result['msg'] = msg
+            else:
+                # Output msg in result, prepend "user.info: " to support parsing from log
+                if isinstance(msg, list):
+                    result['msg'] = ['user.info: ' + m for m in msg]
+                else:
+                    result['msg'] = 'user.info: ' + msg
+                    # Force display of result like debug
+
+        if not user and body != None:
+            # Output msg in result, prepend "user.body: " to support parsing from log
+            result['msg'] = 'user.body: ' + body
+            # Force display of result like debug
+
         if data:
             result['data'] = data
             if not isinstance(data, dict):
@@ -54,26 +90,76 @@ class ActionModule(ActionBase):
                 result['error'] = 'data must be a dictionary of name/value pairs'
                 return result
 
-        # Force display of result like debug
-        result['_ansible_verbose_always'] = True
+        if user:
+            result['user'] = user
 
         try:
-            output_dir = self._templar.template(
-                task_vars.get('output_dir',
-                    task_vars['hostvars'].get('localhost',{}).get('output_dir',
-                        task_vars.get('playbook_dir', '.')
-                    )
-                )
-            )
-            if msg:
-                fh = open(os.path.join(output_dir, 'user-info.yaml'), 'a')
-                fh.write('- ' + json.dumps(msg) + "\n")
-                fh.close()
-            if data:
-                fh = open(os.path.join(output_dir, 'user-data.yaml'), 'a')
-                for k, v in data.items():
-                    fh.write("{0}: {1}\n".format(k, json.dumps(v)))
-                fh.close()
+            _action_expr = '{{ ACTION | default(hostvars.localhost.ACTION) | default("provision", true) }}'
+            action = self._templar.template(trust_as_template(_action_expr))
+
+            # Use default(..., true) so empty strings/falsey values are treated as unset.
+            _out_expr = '{{ output_dir \
+                           | default(hostvars.localhost.output_dir, true) \
+                           | default(playbook_dir, true) \
+                           | default(".", true) }}'
+            output_dir = self._templar.template(trust_as_template(_out_expr))
+
+            # Attempt to make output_dir if not exists
+            try:
+                os.makedirs(output_dir)
+            except OSError:
+                pass
+
+            if not user and msg != None:
+                with open(os.path.join(output_dir, f'{action}-user-info.yaml'), 'a') as fh:
+                    if isinstance(msg, list):
+                        for m in msg:
+                            fh.write('- ' + json.dumps(m) + "\n")
+                    else:
+                        fh.write('- ' + json.dumps(msg) + "\n")
+
+            if not user and body != None:
+                with open(os.path.join(output_dir, f'{action}-user-body.yaml'), 'a') as fh:
+                    fh.write('- ' + json.dumps(body) + "\n")
+
+            if data or user:
+                data = json.loads(json.dumps(data))
+                user_data = None
+                try:
+                    with open(os.path.join(output_dir, f'{action}-user-data.yaml'), 'r') as fh:
+                        user_data = yaml.safe_load(fh) or {}
+                except FileNotFoundError:
+                    pass
+
+                if user_data == None:
+                    user_data = {}
+
+                if user:
+                    if 'users' not in user_data:
+                        user_data['users'] = {}
+                    if user in user_data['users']:
+                        user_data_item = user_data['users'][user]
+                        user_data_item.update(data)
+                    else:
+                        user_data_item = data
+                        user_data['users'][user] = user_data_item
+                    if msg:
+                        msg_str = "\n".join(msg) if isinstance(msg, list) else msg
+                        if 'msg' in user_data_item:
+                            user_data_item['msg'] += "\n" + msg_str
+                        else:
+                            user_data_item['msg'] = msg_str
+                    if body:
+                        if 'body' in user_data_item:
+                            user_data_item['body'] += "\n" + body
+                        else:
+                            user_data_item['body'] = body
+                else:
+                    user_data.update(data)
+
+                with open(os.path.join(output_dir, f'{action}-user-data.yaml'), 'w') as fh:
+                    yaml.safe_dump(user_data, stream=fh, explicit_start=True)
+
             result['failed'] = False
         except Exception as e:
             result['failed'] = True

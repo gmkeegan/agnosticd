@@ -9,16 +9,16 @@
 # - name: test that command worked
 #   debug:
 #     var: groupadd_register
-#     verbosity: 2 
+#     verbosity: 2
 
 # - name: check quota is deployed
-#   k8s_facts:
+#   k8s_info:
 #     api_version: quota.openshift.io/v1
 #     kind: ClusterResourceQuota
 #     name: clusterquota-{{admin_username}}-{{lab_name}}
 #   register: quota_exists
 
-# - debug: 
+# - debug:
 #     msg: "{{quota_exists}}"
 
 # - name: Create user Quota - clusterresourcequota

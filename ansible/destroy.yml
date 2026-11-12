@@ -4,10 +4,24 @@
 ############ Step 006 Destroy Workshop using workshop_prefix
 ################################################################################
 ################################################################################
+- name: Step 0000 Set Action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags:
+    - must
+    - step0000
+    - setup_runtime
+  become: false
+  tasks:
+    - name: Set ACTION to destroy
+      when: ACTION is undefined
+      set_fact:
+        ACTION: destroy
 
 - import_playbook: setup_runtime.yml
 
-- name: Detect in what region the stack is
+- name: Step 0000 Detect in what region the stack is
   hosts: localhost
   connection: local
   gather_facts: False
@@ -18,11 +32,24 @@
         - target_regions is not defined
       include_tasks: cloud_providers/ec2_detect_region_tasks.yml
 
+    - name: Run infra-aws-capacity-reservation
+      when: cloud_provider == 'ec2'
+      include_role:
+        name: infra-aws-capacity-reservation
+      vars:
+        ACTION: destroy
+
 - import_playbook: >-
     {{ lookup('first_found', {
-         'files': [ 'destroy_env.yml', cloud_provider + '_destroy_env.yml' ],
-         'paths': [ 'configs/' + env_type, 'cloud_providers/' ]
+         'files': [ 'destroy_env.yml',
+                    cloud_provider + '_destroy_env.yml'
+                  ],
+         'paths': [ 'configs/' + env_type,
+                    'cloud_providers/'
+                  ]
        })
     }}
+
+- import_playbook: save_output_dir.yml
 
 - import_playbook: completion_callback.yml

@@ -1,0 +1,23 @@
+---
+# Post Workload deployment tasks
+- name: Print User Details
+  agnosticd_user_info:
+    msg:
+      - ""
+      - "AI500 MLOps Enablement environment is ready!"
+      - ""
+      - "Lab Instructions: https://rhoai-mlops.github.io/lab-instructions/"
+      - ""
+      - ""
+      - "Learner users have been provisioned."
+      - "They are named user1 to user{{ num_users }}"
+      - ""
+      - "Users provisioned: {{ num_users }}"
+      - "User password: thisisthepassword"
+      - ""
+
+# Leave this as the last task in the playbook.
+- name: post_workload tasks complete
+  debug:
+    msg: "Post-Workload Tasks completed successfully."
+  when: not silent | bool

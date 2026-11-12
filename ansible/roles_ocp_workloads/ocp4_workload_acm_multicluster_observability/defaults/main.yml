@@ -1,0 +1,20 @@
+---
+become_override: false
+ocp_username: user-redhat.com
+silent: false
+tmp_dir: /tmp/{{ guid }}
+tmp_kubeconfig: "{{ tmp_dir }}/.kube/config"
+
+##---------------------------------------------##
+## OCP hub cluster key/api url
+##---------------------------------------------##
+#ocp_key_hub: CHANGEME
+#ocp_hub_api_url: CHANGEME
+
+## MultiCluster Observability related variables ##
+ocp4_workload_acm_multicluster_observability_namespace: open-cluster-management-observability
+
+## Cluster Prometheus retention (applied to cluster-monitoring-config ConfigMap)
+## Set these in your catalog item to cap emptyDir Prometheus disk usage.
+ocp4_workload_cluster_monitoring_retention: ""
+ocp4_workload_cluster_monitoring_retention_size: ""

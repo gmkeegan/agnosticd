@@ -1,0 +1,14 @@
+---
+- name: Set student Console password
+  set_fact:
+    vmware_ibm_sandbox_generated_password: >-
+      {{- lookup('password', '/dev/null length=1 chars=ascii_lowercase') -}}
+      {{- lookup('password', '/dev/null length=1 chars=ascii_uppercase') -}}
+      {{- lookup('password', '/dev/null length=10') -}}
+      {{- lookup('password', '/dev/null length=1 chars=digits') -}}
+
+- name: Create the sandbox account access
+  include_role:
+    name: infra_vmware_ibm_sandbox
+  vars:
+    action: "create"

@@ -1,0 +1,33 @@
+---
+# Implement your Workload removal tasks here
+- name: Remove Router with Certificates
+  kubernetes.core.k8s:
+    state: absent
+    api_version: operator.openshift.io/v1
+    kind: IngressController
+    name: default
+    namespace: openshift-ingress-operator
+
+- name: Create Router without Certificates
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('file', './files/router-without-certs.yaml') | from_yaml }}"
+
+- name: Remove Router Certificates
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Secret
+    name: router-certs
+    namespace: openshift-ingress
+
+- name: Remove Certificate renewal cronjob
+  ansible.builtin.cron:
+    name: LETS_ENCRYPT_RENEW
+    state: absent
+
+# Leave this as the last task in the playbook.
+- name: Remove_workload tasks complete
+  when: not silent | bool
+  ansible.builtin.debug:
+    msg: "Remove Workload tasks completed successfully."

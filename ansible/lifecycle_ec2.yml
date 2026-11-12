@@ -1,45 +1,71 @@
 ---
+- name: Retrieve the region from user-data.yaml
+  when: aws_region | default('') == ''
+  set_fact:
+    aws_region: "{{ lookup('agnosticd_user_data', 'aws_region') }}"
+
 - environment:
     AWS_ACCESS_KEY_ID: "{{aws_access_key_id}}"
     AWS_SECRET_ACCESS_KEY: "{{aws_secret_access_key}}"
     AWS_DEFAULT_REGION: "{{aws_region_final|d(aws_region)}}"
   block:
-    - when: ACTION == 'stop'
-      name: Stop instances by (guid,env_type) tags
-      ec2_instance:
-        state: stopped
-        wait: no
+    - name: Get EC2 instances filtering by guid
+      amazon.aws.ec2_instance_info:
         filters:
           "tag:guid": "{{ guid }}"
-          # TODO: uncomment this after a few weeks
-          #"tag:env_type": "{{ env_type }}"
+      register: r_instances
 
-    - when: ACTION == 'start'
-      name: Start instances by (guid, env_type) tags
-      ec2_instance:
-        state: started
-        wait: no
-        filters:
-          "tag:guid": "{{ guid }}"
-          # TODO: uncomment this after a few weeks
-          #"tag:env_type": "{{ env_type }}"
+    - when:
+        - ACTION == 'stop'
+        - _instance_ids_running | length > 0
+      name: Stop instances
+      amazon.aws.ec2_instance:
+        state: stopped
+        wait: false
+        instance_ids: "{{ _instance_ids_running }}"
+      vars:
+        _instance_ids_running: >-
+          {{ r_instances.instances
+          | default([])
+          | selectattr("state.name", "equalto", "running")
+          | map(attribute="instance_id")
+          | list
+          }}
+
+    - when:
+        - ACTION == 'start'
+        - _instance_ids_stopped | length > 0
+      name: Start instances
+      amazon.aws.ec2_instance:
+        state: running
+        wait: false
+        instance_ids: "{{ _instance_ids_stopped }}"
+      vars:
+        _instance_ids_stopped: >-
+          {{ r_instances.instances
+          | default([])
+          | selectattr("state.name", "equalto", "stopped")
+          | map(attribute="instance_id")
+          | list
+          }}
 
     - when: ACTION == 'status'
       block:
-        - name: Get EC2 facts using (guid, env_type) tag
-          ec2_instance_facts:
-            filters:
-              "tag:guid": "{{ guid }}"
-              # TODO: uncomment this after a few weeks
-              #"tag:env_type": "{{ env_type }}"
-          register: r_instances
+        - name: Report status in user info
+          agnosticd_user_info:
+            msg: |-
+              {{ "%-60s %-10s %s" | format("Instance", "State", "Type") }}
+              ----------------------------------------------------------------
+              {% for instance in r_instances.instances %}
+              {{ "%-60s %-10s %s" | format(instance.tags.Name, instance.state.name, instance.instance_type) }}
+              {% endfor %}
 
         - name: Print status information to a file
           copy:
             dest: "{{ output_dir }}/status.txt"
             content: |-
-              {{ "%-60s" | format('Instance') }} State      Type
+              {{ "%-60s %-10s %s" | format("Instance", "State", "Type") }}
               ----------------------------------------------------------------
               {% for instance in r_instances.instances %}
-              {{ "%-60s" | format(instance.tags.Name) }} {{ "%-10s" | format(instance.state.name) }} {{ instance.instance_type }}
+              {{ "%-60s %-10s %s" | format(instance.tags.Name, instance.state.name, instance.instance_type) }}
               {% endfor %}

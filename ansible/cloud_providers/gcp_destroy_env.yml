@@ -1,0 +1,17 @@
+---
+- import_playbook: ../include_vars.yml
+
+- name: Delete Infrastructure
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Run infra-gcp-template-destroy
+      when: not gcp_zombie_env | default(false) | bool
+      include_role:
+        name: infra-gcp-template-destroy
+    - name: Remove Google Cloud SDK
+      file:
+        path: "{{ output_dir }}/google-cloud-sdk"
+        state: absent

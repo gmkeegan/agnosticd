@@ -1,5 +1,15 @@
 ---
+roles:
 # External role to allow use of ocp-workload-openshift-applier
 - src: https://github.com/redhat-cop/openshift-applier
   name: openshift-applier
   version: v2.1.1
+
+collections:
+- name: kubernetes.core
+  version: 5.0.0
+- name: community.aws
+  version: 8.0.0
+- name: https://github.com/rhpds/assisted_installer.git
+  type: git
+  version: v0.0.8

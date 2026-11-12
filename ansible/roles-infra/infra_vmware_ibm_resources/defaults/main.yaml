@@ -1,0 +1,8 @@
+---
+# Naming of instances
+vmc_instance_numeration: '%d'
+
+# Disable SSL certificate validation for vCenter connections
+vmw_validate_certs: false
+
+publicips: []

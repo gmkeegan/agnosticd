@@ -1,0 +1,48 @@
+---
+become_override: false
+silent: false
+
+ocp4_workload_shared_cluster_username: ""
+ocp4_workload_shared_cluster_password: ""
+ocp4_workload_shared_cluster_email: "{{ ocp4_workload_shared_cluster_username }}@rhdp.com"
+
+ocp4_workload_shared_cluster_keycloak_namespace: rhsso
+
+ocp4_workload_shared_cluster_keycloak_realm:
+  app: sso
+  realm: rhdp
+
+# All OpenShift groups to add the user to...
+# Leave empty ( {} )to not add the user to any groups.
+ocp4_workload_shared_cluster_user_groups: []
+
+# ClusterResourceQuota. Must be in the format of a ClusterResourceQuota
+# API resource (.spec.quota.hard)
+# Set to '{}' to NOT create a ClusterResourceQuota.
+# ocp4_workload_shared_cluster_quota: {}
+ocp4_workload_shared_cluster_quota:
+  hard:
+    requests.memory: 16Gi
+    limits.memory: 16Gi
+    requests.cpu: "2"
+    limits.cpu: "4"
+    requests.storage: 20Gi
+
+# This is where devspaces operator and its shared components are installed.
+ocp4_workload_shared_cluster_devspaces_namespace: openshift-operators
+
+ocp4_workload_shared_cluster_devworkspace: true
+ocp4_workload_shared_cluster_devworkspace_namespace: devspaces
+ocp4_workload_shared_cluster_devworkspace_name: devworkspace
+ocp4_workload_shared_cluster_devworkspace_project: demoproject
+ocp4_workload_shared_cluster_devworkspace_git_repo: https://github.com/eclipse-che/che-docs
+ocp4_workload_shared_cluster_devworkspace_git_revision: main
+ocp4_workload_shared_cluster_devworkspace_components:
+  - name: tooling
+    container:
+      image: registry.redhat.io/devspaces/udi-rhel8:latest
+      cpuRequest: 500m
+      memoryRequest: 1G
+      memoryLimit: 1G
+
+ocp4_workload_shared_cluster_rhoai: true

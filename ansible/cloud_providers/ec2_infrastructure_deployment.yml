@@ -11,15 +11,73 @@
     - step001.1
     - deploy_infrastructure
   tasks:
+    - name: Run infra-images
+      include_role:
+        name: infra-images
+
+    - name: Skip infra-aws-capacity-reservation (reservations already exist)
+      debug:
+        msg: >-
+          Skipping capacity reservation - valid reservations already exist
+          in {{ agnosticd_aws_capacity_reservation_results.region }}
+      when: >-
+        agnosticd_aws_capacity_reservation_results is defined
+        and agnosticd_aws_capacity_reservation_results.reservations | default({}) | length > 0
+
+    - name: Run infra-aws-capacity-reservation
+      when: >-
+        agnosticd_aws_capacity_reservation_results is not defined
+        or agnosticd_aws_capacity_reservation_results.reservations | default({}) | length == 0
+      include_role:
+        name: infra-aws-capacity-reservation
+      vars:
+        ACTION: provision
+
+    - when: >-
+        agnosticd_aws_capacity_reservation_results.reservations | default({}) | length > 0
+      block:
+        - name: Empty the agnosticd_images and run the detection again
+          set_fact:
+            agnosticd_images: {}
+
+        - name: Run infra-images again to use the proper region selected by the reservations
+          include_role:
+            name: infra-images
+
+    - name: Run infra-aws-open-environment Role
+      include_role:
+        name: infra-aws-open-environment
+      vars:
+        ACTION: provision
+      when: agnosticd_open_environment | default(false) | bool
+
+    - name: Create ssh provision key
+      include_role:
+        name: create_ssh_provision_key
+      when:
+        - instances | default([]) | length > 0
+        - ssh_provision_key_name is undefined
+
+    - name: Locate environment SSH key
+      include_role:
+        name: locate_env_authorized_key
+      when: instances | default([]) | length > 0
+
+    - name: Create keypair in ec2
+      include_role:
+        name: infra-ec2-ssh-key
+      when: instances | default([]) | length > 0
+
     - name: Run infra-ec2-template-generate Role
-      import_role:
+      include_role:
         name: infra-ec2-template-generate
 
     - name: Run infra-ec2-template-create Role
-      import_role:
+      include_role:
         name: infra-ec2-template-create
       vars:
         aws_region_loop: "{{aws_region}}"
+      when: cloudformation_enabled | default(true) | bool
 
     - name: Run infra-ec2-template-create Role into FallBack region
       include_role:
@@ -28,13 +86,16 @@
         aws_region_loop: "{{item}}"
       with_items: "{{ fallback_regions }}"
       when:
+        - cloudformation_enabled | default(true) | bool
         - fallback_regions is defined
         - cloudformation_out is failed
 
     - name: report Cloudformation error
       fail:
         msg: "FAIL {{ project_tag }} Create Cloudformation"
-      when: not cloudformation_out is succeeded
+      when:
+        - cloudformation_enabled | default(true) | bool
+        - not cloudformation_out is succeeded
       tags:
         - provision_cf_template
 
@@ -49,18 +110,23 @@
     - create_inventory
     - create_ssh_config
   tasks:
-    # Sometimes the infra step is skipped, for example when scaling up a cluster.
-    # when step001.1 is skipped, aws_region_final is not defined.
-    - when: aws_region_final is not defined
-      include_tasks: ec2_detect_region_tasks.yml
+    - when: create_ssh_config | default(true) | bool
+      block:
+        # Sometimes the infra step is skipped, for example when scaling up a cluster.
+        # when step001.1 is skipped, aws_region_final is not defined.
+        - when: aws_region_final is not defined
+          include_tasks: ec2_detect_region_tasks.yml
 
-    - name: Run infra-ec2-create-inventory Role
-      import_role:
-        name: infra-ec2-create-inventory
+        - name: Run infra-ec2-create-inventory Role
+          include_role:
+            name: infra-ec2-create-inventory
 
-    - name: Run Common SSH Config Generator Role
-      import_role:
-        name: infra-common-ssh-config-generate
+        - name: Run Common SSH Config Generator Role
+          when:
+            - groups.bastions is defined
+            - groups.bastions | length > 0
+          include_role:
+            name: infra-common-ssh-config-generate
 
 # include global vars again, this time for all hosts now that the inventory is built
 - import_playbook: ../include_vars.yml
@@ -89,12 +155,21 @@
         ansible_ssh_extra_args: "{{ ansible_ssh_extra_args|d() }} -F {{output_dir}}/{{ env_type }}_{{ guid }}_ssh_conf"
 
     - name: Run infra-ec2-wait_for_linux_hosts Role
-      import_role:
+      include_role:
         name: infra-ec2-wait_for_linux_hosts
 
     - name: Run infra-ec2-linux-set-hostname Role
-      import_role:
+      include_role:
         name: infra-ec2-linux-set-hostname
+
+    - name: Add authorized_keys
+      include_role:
+        name: ssh_authorized_keys
+      when: >-
+        ssh_authorized_keys | default([]) | length > 0
+        or
+        all_ssh_authorized_keys | default([]) | length > 0
+
 
 - name: Step 001.4 Configure Windows Hosts and Wait for Connection
   gather_facts: false
@@ -104,6 +179,11 @@
     - step001
     - step001.4
   tasks:
+    - name: Set facts for Windows remote access
+      ansible.builtin.include_role:
+        name: infra-windows-connection-facts
+      when: infra_windows_connection_facts_type is defined
+
     - name: set facts for remote access
       tags:
         - create_inventory
@@ -116,9 +196,10 @@
         ansible_user: Administrator
         ansible_winrm_server_cert_validation: ignore
         aws_region_final: "{{hostvars['localhost'].aws_region_final}}"
+      when: infra_windows_connection_facts_type is not defined
 
     - name: Run infra-ec2-wait_for_linux_hosts Role
-      import_role:
+      include_role:
         name: infra-ec2-wait_for_windows_hosts
 
     - name: Set output_dir for all windows hosts

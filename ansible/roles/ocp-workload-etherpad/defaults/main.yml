@@ -1,7 +1,7 @@
 ---
-become_override: False
+become_override: false
 ocp_username: user-redhat.com
-silent: False
+silent: false
 tmp_dir: /tmp/{{ guid }}
 tmp_kubeconfig: "{{ tmp_dir }}/.kube/config"
 
@@ -11,7 +11,7 @@ etherpad_app_name: "etherpad"
 
 num_users: 200
 
-# Mysql
+# Mysql
 etherpad_image: quay.io/wkulhanek/etherpad:1.7.5
 mysql_database: sampledb
 mysql_password: user123XYZ

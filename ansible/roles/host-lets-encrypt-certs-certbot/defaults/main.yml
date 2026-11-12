@@ -54,4 +54,4 @@ _certbot_user: "{{ ansible_user }}"
 
 _certbot_virtualenv: "/home/{{ _certbot_user }}/virtualenvs/certbot"
 
-use_python3: true
+certbot_cert_manager_provider: letsencrypt

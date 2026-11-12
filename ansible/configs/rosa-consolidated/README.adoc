@@ -1,0 +1,71 @@
+= ROSA
+
+== Config Description
+
+The following config includes:
+
+* One bastion host for ROSA installation
+* SSH access setup
+* Command line tools to use with ROSA
+* Optionally a deployed ROSA cluster
+
+== Review the `default_vars.yml` variable file
+
+* This file link:./default_vars.yml[./default_vars.yml] contains all the variables you need to define to control the deployment of your environment.  These are the defaults.
+
+* Override the defaults for your environment by creating your own myenvironment-variables.yml file, as below.
+
+== AWS Prereqs for ROSA
+
+Please see https://docs.openshift.com/rosa/rosa_getting_started/rosa-aws-prereqs.html for a list of pre-reqs for the target AWS account.
+
+== Secrets
+
+You can authenticate to ROSA using either a service account (client credentials) or a personal token.
+
+=== Option 1: Service Account (preferred)
+
+Create a service account at https://console.redhat.com — the `client-id` and `client-secret` will be provided there.
+
+Define `rosa_sa_client_id` and `rosa_sa_secret` variables. Optionally set `rosa_api_url` (defaults to `https://api.openshift.com`).
+
+[source,yaml]
+----
+rosa_sa_client_id: <your-client-id>
+rosa_sa_secret: <your-client-secret>
+----
+
+=== Option 2: Token
+
+Define the `rosa_token` variable. This token can be created and downloaded from https://cloud.redhat.com/openshift/token/rosa
+
+[source,yaml]
+----
+rosa_token: eyJ<..REDACTED..>dz8
+----
+
+If `rosa_token` is not provided, the fallback `gpte_rosa_token` from the secret store is used.
+
+== Running Ansible Playbook
+
+=== Running Playbook With Environment and Secrets files
+
+You can create yaml files of your desired configs and secrets and execute them:
+
+`ansible-playbook ansible/main.yaml -e @myenvironment-variables.yml  -e@my-secrets.yml`
+
+=== To Delete an environment
+
+Run the `destroy_env.yml` playbook.
+
+Ex: `ansible-playbook ansible/configs/rosa/destroy_env.yml -e @myenvironment-variables.yml  -e@my-secrets.yml`
+
+The teardown process is roughly as follows:
+* Delete sandbox
+
+== Software stages in config provide
+
+* Install AWS CLI on bastion
+* Install ROSA CLI on bastion
+* Optionally run ROSA installer (default is to run installer)
+

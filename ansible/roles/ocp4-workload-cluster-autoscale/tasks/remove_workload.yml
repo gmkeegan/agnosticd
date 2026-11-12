@@ -1,5 +1,5 @@
-# vim: set ft=ansible
 ---
+# vim: set ft=ansible
 # Implement your Workload removal tasks here
 
 - name: delete cluster autoscaler
@@ -12,7 +12,7 @@
         name: "default"
 
 - name: get machine auto scalers
-  k8s_facts:
+  k8s_info:
     api_version: autoscaling.openshift.io/v1alpha1
     kind: MachineAutoscaler
     namespace: openshift-machine-api
@@ -28,4 +28,4 @@
 - name: remove_workload tasks complete
   debug:
     msg: "Remove Workload tasks completed successfully."
-  when: not silent|bool
+  when: not silent | bool

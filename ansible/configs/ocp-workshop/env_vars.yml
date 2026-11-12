@@ -83,7 +83,7 @@ glusterfs_image_tag: v3.11
 
 ocp_report: false
 remove_self_provisioners: false
-idm_ca_url: http://ipa.opentlc.com/ipa/config/ca.crt
+idm_ca_url: https://gpte-public.s3.amazonaws.com/opentlc_ipa_ca.crt
 zabbix_host: 23.246.247.58
 
 # Options for container_runtime: docker, cri-o
@@ -94,11 +94,7 @@ docker_device: /dev/xvdb
 ### If you want a Key Pair name created and injected into the hosts,
 # set `set_env_authorized_key` to true and set the keyname in `env_authorized_key`
 # you can use the key used to create the environment or use your own self generated key
-# if you set "use_own_key" to false your PRIVATE key will be copied to the bastion. (This is {{key_name}})
-
-use_own_key: true
 env_authorized_key: "{{guid}}key"
-ansible_ssh_private_key_file: ~/.ssh/{{key_name}}.pem
 set_env_authorized_key: true
 
 # Is this running from Red Hat Ansible Tower
@@ -111,7 +107,8 @@ admin_project: "ocp-workshop"
 enable_workshops_catalog: false
 
 # Red Hat Registry Location
-redhat_registry: "{{ 'registry.access.redhat.com' if repo_version is version_compare('3.11', '<')  else 'registry.redhat.io' }}"
+redhat_registry: >-
+  {{ 'registry.access.redhat.com' if repo_version is version_compare('3.11', '<')  else 'registry.redhat.io' }}
 
 ### Azure
 
@@ -133,8 +130,8 @@ az_resource_group: "{{ project_tag }}"
 HostedZoneId: Z1TQFSYFZUAO0D
 # The region to be used, if not specified by -e in the command line
 aws_region: us-east-1
-# The key that is used to
-key_name: "default_key_name"
+# This is just used by Azure needs a default
+dns_delegation: true
 
 ## Networking (AWS)
 subdomain_base_short: "{{ guid }}"
@@ -157,7 +154,7 @@ support_instance_count: "{{ 3 if install_glusterfs|bool else 1 }}"
 # scaleup
 new_node_instance_count: 0
 
-support_instance_public_dns: "{{ true if install_glusterfs | bool else false }}" 
+support_instance_public_dns: "{{ true if install_glusterfs | bool else false }}"
 
 ###### VARIABLES YOU SHOULD ***NOT*** CONFIGURE FOR YOUR DEPLOYEMNT
 timeout: 60
@@ -178,15 +175,16 @@ openshift_master_overwrite_named_certificates: true
 
 lets_encrypt_openshift_master_named_certificates:
   - certfile: "/root/certificates/fullchain.pem"
-    keyfile: "/root/certificates/key.pem"
+    keyfile: "/root/certificates/privkey.pem"
     cafile: "/root/certificates/ca.cer"
 
 lets_encrypt_openshift_hosted_router_certificate:
   certfile: "/root/certificates/fullchain.pem"
-  keyfile: "/root/certificates/key.pem"
+  keyfile: "/root/certificates/privkey.pem"
   cafile: "/root/certificates/ca.cer"
 
-project_request_message: 'To provision Projects you must request access in https://labs.opentlc.com or https://rhpds.redhat.com'
+project_request_message: >-
+  To provision Projects you must request access in https://labs.opentlc.com or https://rhpds.redhat.com
 
 cloudapps_suffix: 'apps.{{subdomain_base}}'
 
